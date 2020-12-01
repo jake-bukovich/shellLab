@@ -156,19 +156,19 @@ void eval(char *cmdline)
   // use below to launch a process.
   //
   char *argv[MAXARGS];
-  char buff[MAXLINE];  //array of values from parsed input
-  pid_t pid;  //save the process ID
-  sigset_t mask; //initialize mask to stop output from children 
+  char buf[MAXLINE];  /*array that holds values from parsed input */
+  pid_t pid;  /*save the process ID somewhere so we don't lose it.*/
+  sigset_t mask; /*create a mask to supress output from children */
 
-  //make empty signal set
+  /* initialize empty signal set */
   if(sigemptyset(&mask)) 
     unix_error("eval: sigemptyset error");
   
-  // add SIGCHLD signal
+  /* add SIGCHLD signal to signal set */
   if(sigaddset(&mask, SIGCHLD)) 
     unix_error("eval: sigaddset error");
 
-  strcpy(buff, cmdline); // Copy command line into buf.
+  strcpy(buf, cmdline); // Copy command line into buf.
 
   //
   // The 'bg' variable is TRUE if the job should run
@@ -184,10 +184,10 @@ void eval(char *cmdline)
 
   /* Parent blocks SIGCHLD signal temporarily */
   sigprocmask(SIG_BLOCK, &mask, 0);
-    
-    if( (pid = fork()) <= 0) { //create child and run if-statement
+
+    if( (pid = fork()) <= 0) { //create a child and run process in this if-statement
       if (pid < 0) unix_error("fork: forking error");
-      setpgid(0,0);  // Set group ID for all children
+      setpgid(0,0);  // Set group ID for all of the chilluns
       sigprocmask(SIG_UNBLOCK, &mask, 0);
 
       if(execve(argv[0], argv, environ) < 0) {
@@ -196,7 +196,7 @@ void eval(char *cmdline)
       }
     }
 
-    // Parent waits for fg to terminate 
+    // Parent waits for forground job to terminate 
     if(!bg){ 
       
       addjob(jobs, pid, FG, cmdline);
@@ -283,13 +283,14 @@ void do_bgfg(char **argv)
 
   if (cmd == "bg"){
     if(kill(-(jobp->pid), SIGCONT) < 0) unix_error("do_bgfg: Kill error");
-    jobp->state = BG; //change job state to bg
+    jobp->state = BG; // change job state to bg
     printf("[%d] (%d) %s", (jobp->jid), (jobp->pid), (jobp->cmdline)); //print info
+    //don't wait b/c job is in bg.
   }
   else if (cmd == "fg"){
     if(kill(-(jobp->pid), SIGCONT) < 0) unix_error("do_bgfg: Kill error");
-    jobp->state = FG; //change job state to foreground
-    waitfg(jobp->pid);  //wait for job
+    jobp->state = FG; // change job state to foreground
+    waitfg(jobp->pid);  // wait for said job since it's now in foreground.
   }
   else{
     unix_error("do_bgfg error");
@@ -331,16 +332,16 @@ void sigchld_handler(int sig)
   while ((pid = waitpid(-1, &status, WNOHANG | WUNTRACED)) > 0 ) {
 
 
-  if (WIFEXITED(status)) {   //check if child terminated
+  if (WIFEXITED(status)) {   /*checks if child terminated normally */
       deletejob(jobs, pid);
   }
 
-  if (WIFSIGNALED(status)) {  //check if child terminated by signal that wasn't caught
+  if (WIFSIGNALED(status)) {  /*checks if child was terminated by a signal that was not caught */
       printf("Job [%d] (%d) terminated by signal %d\n", pid2jid(pid), pid, WTERMSIG(status));
       deletejob(jobs,pid);
   }
 
-  if (WIFSTOPPED(status)) {     //check if child process which caused return is stopped */
+  if (WIFSTOPPED(status)) {     /*checks if child process that caused return is currently stopped */
       getjobpid(jobs, pid)->state = ST;
       printf("Job [%d] (%d) stopped by signal %d\n", pid2jid(pid), pid, WSTOPSIG(status) );
   
